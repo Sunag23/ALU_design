@@ -1,36 +1,37 @@
 `timescale 1ns / 1ps
-module alu#(parameter N=8,parameter W=4)
+module alu #(parameter N=8, parameter W=4)
 (
-input wire clk,
-input wire rst,
-input wire [1:0]input_valid,
-input wire mode,
-input wire [W-1:0]cmd,
-input wire CE,
-input wire [N-1:0]OPA,
-input wire [N-1:0]OPB,
-input wire cin,
-output reg err,
-output reg [2*N-1:0]res,
-output reg OFLOW,
-output reg cout,
-output reg G,
-output reg L,
-output reg E
+    input wire clk,
+    input wire rst,
+    input wire [1:0] input_valid,
+    input wire mode,
+    input wire [W-1:0] cmd,
+    input wire CE,
+    input wire [N-1:0] OPA,
+    input wire [N-1:0] OPB,
+    input wire cin,
+
+    output reg err,
+    output reg [2*N-1:0] res,
+    output reg OFLOW,
+    output reg cout,
+    output reg G,
+    output reg L,
+    output reg E
 );
 
+reg [N-1:0] rot;
 reg [1:0] count;
-
 always @(posedge clk or posedge rst)
 begin
     if(rst)
         count <= 0;
-
     else if(CE)
     begin
-      if(mode && (cmd==4'd9 || cmd==4'd10))
+        if(cmd==4'd9 || cmd==4'd10 ||
+           cmd==4'd11 || cmd==4'd12)
         begin
-            if(count < 2)
+            if(count < 3)
                 count <= count + 1;
             else
                 count <= 0;
@@ -47,336 +48,277 @@ end
 
 always @(posedge clk or posedge rst)
 begin
-
 if(rst)
 begin
-res<={2*N{1'bz}};
-err<=1'b0;
-OFLOW<=1'b0;
-G<=1'b0;
-L<=1'b0;
-E<=1'b0;
-cout<=1'b0;
+    res    <= 0;
+    err    <= 0;
+    OFLOW <= 0;
+    cout   <= 0;
+    G      <= 0;
+    L      <= 0;
+    E      <= 0;
 end
-
 else if(!CE)
 begin
-res<=res;
-err<=err;
-OFLOW<=OFLOW;
-G<=G;
-L<=L;
-E<=E;
-cout<=cout;
+    res    <= res;
+    err    <= err;
+    OFLOW <= OFLOW;
+    cout   <= cout;
+    G      <= G;
+    L      <= L;
+    E      <= E;
 end
-
-else if(mode &&
-(
- ((cmd==4'd9 || cmd==4'd10 || cmd==4'd11 || cmd==4'd12) && count==2'd2)
- ||
- (!(cmd==4'd9 || cmd==4'd10 || cmd==4'd11 || cmd==4'd12) && count==2'd1)
-))
+else if(mode)
 begin
-
 case(cmd)
-
-4'd0:begin
-if(input_valid==2'b11)
+4'd0:
 begin
-res<=OPA+OPB;
-cout<=({1'b0, OPA} + {1'b0, OPB}) >> N;
-{OFLOW,err,G,E,L}<=5'b00000;
+    if(input_valid==2'b11)
+    begin
+        res <= OPA + OPB;
+        cout <= (OPA + OPB) >> N;
+        OFLOW <= 0;
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
+4'd1:
 begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
+    if(input_valid==2'b11)
+    begin
+        res <= OPA - OPB;
+        cout <= (OPA >= OPB);
+        OFLOW <= !(OPA >= OPB);
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-end
-
-4'd1:begin
-if(input_valid==2'b11)
+4'd2:
 begin
-res<=OPA-OPB;
-cout<=(OPA>=OPB);
-OFLOW<=!(OPA>=OPB);
-{err,G,E,L}<=4'b0000;
+    if(input_valid==2'b11)
+    begin
+        res <= OPA + OPB + cin;
+        cout <= (OPA + OPB + cin) >> N;
+        OFLOW <= 0;
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
+4'd3:
 begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
+    if(input_valid==2'b11)
+    begin
+        res <= OPA - OPB - cin;
+        cout <= ({1'b0,OPA} >= ({1'b0,OPB}+cin));
+        OFLOW <= ({1'b0,OPA} < ({1'b0,OPB}+cin));
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-end
-
-4'd2:begin
-if(input_valid==2'b11)
-begin
-res<=OPA+OPB+cin;
-cout<=(OPA+OPB+cin)>>N;
-OFLOW<=1'b0;
-{err,G,E,L}<=4'b0000;
-end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
-4'd3:begin
-if(input_valid==2'b11)
-begin
-res<=OPA-OPB-cin;
-cout<=({1'b0,OPA}>={1'b0,OPB}+cin);
-OFLOW<=({1'b0, OPA} < ({1'b0, OPB} + cin));
-{err,G,E,L}<=4'b0000;
-end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
 4'd4:
 begin
-if(input_valid[0])
-begin
-res<=OPA+1;
-cout<=(OPA==0);
-OFLOW<=1'b0;
-{err,G,E,L}<=4'b0000;
+    if(input_valid[0])
+    begin
+        res <= OPA + 1;
+        cout <= (OPA == 8'hFF);
+        OFLOW <= 0;
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
 4'd5:
 begin
-if(input_valid[0])
-begin
-res<=OPA-1;
-cout<=(OPA==0);
-OFLOW<=1'b0;
-{err,G,E,L}<=4'b0000;
+    if(input_valid[0])
+    begin
+        res <= OPA - 1;
+        cout <= (OPA != 0);
+        OFLOW <= 0;
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
 4'd6:
 begin
-if(input_valid[1])
-begin
-res<=OPB+1;
-cout<=(OPB==0);
-OFLOW<=1'b0;
-{err,G,E,L}<=4'b0000;
+    if(input_valid[1])
+    begin
+        res <= OPB + 1;
+        cout <= (OPB == 8'hFF);
+        OFLOW <= 0;
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
 4'd7:
 begin
-if(input_valid[1])
-begin
-res<=OPB-1;
-cout<=(OPB==0);
-OFLOW<=1'b0;
+    if(input_valid[1])
+    begin
+        res <= OPB - 1;
+        cout <= (OPB != 0);
+        OFLOW <= 0;
+        {err,G,E,L} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
 4'd8:
 begin
-if(input_valid==2'b11)
-begin
-{err,cout,OFLOW}<=3'b000;
-res<={2*N{1'b0}};
-{G,E,L}<={(OPA>OPB),(OPA==OPB),(OPA<OPB)};
+    if(input_valid==2'b11)
+    begin
+        res <= 0;
+        {G,E,L} <= {
+            (OPA > OPB),
+            (OPA == OPB),
+            (OPA < OPB)
+        };
+        {err,cout,OFLOW} <= 0;
+    end
+    else
+        err <= 1;
 end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
 4'd9:
 begin
-if(input_valid==2'b11)
-begin
-res<=(OPA+1)*(OPB+1);
-end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
-4'd10:begin
-if(input_valid==2'b11)
-begin
-res<=(OPA<<1)*OPB;
-{OFLOW,cout,G,L,E}<=5'b00000;
-end
-else
-begin
-err<=1'b1;
-{res,OFLOW,cout,G,L,E}<={res,OFLOW,cout,G,L,E};
-end
-end
-
-4'd11:begin
-if(input_valid==2'b11)
-begin
-res<=$signed(OPA)+$signed(OPB);
-OFLOW<= ((OPA[N-1] == OPB[N-1]) && (res[N-1] != OPA[N-1]));
-{G,L,E}<={($signed(OPA)>$signed(OPB)),($signed(OPA)<$signed(OPB)),($signed(OPA)==$signed(OPB))};
-cout<=0;
-end
-else
-err<=1'b1;
-end
-
-4'd12:begin
-if(input_valid==2'b11)
-begin
-res<=$signed(OPA)-$signed(OPB);
-OFLOW<= ((OPA[N-1] != OPB[N-1]) && (res[N-1] != OPA[N-1]));
-{G,L,E}<={($signed(OPA)>$signed(OPB)),($signed(OPA)<$signed(OPB)),($signed(OPA)==$signed(OPB))};
-cout<=0;
-end
-else
-err<=1'b1;
-end
-
-endcase
-end
-
-  else if(!mode)
-begin
-
-{err,OFLOW,cout,G,E,L} <= 6'b0;
-
-case(cmd)
-
-4'd0:begin
-  if(input_valid==2'b11)
-res<=OPA&OPB;
-end
-
-4'd1:begin
-  if(input_valid==2'b11)
-res<=~(OPA&OPB);
-end
-
-4'd2:begin
-if(input_valid==2'b11)
-  res<=(OPA|OPB);
-end
-
-4'd3:begin
-if(input_valid==2'b11)
-res<=~(OPA|OPB);
-end
-
-4'd4:begin
-if(input_valid==2'b11)
-res<=OPA^OPB;
-end
-
-4'd5:begin
-if(input_valid==2'b11)
-res<=~(OPA^OPB);
-end
-
-4'd6:begin
-if(input_valid[0])
-res<=~(OPA);
-end
-
-4'd7:begin
-if(input_valid[1])
-res<=~(OPB);
-end
-
-4'd8:begin
-if(input_valid[0])
-res<=OPA>>1;
-end
-
-4'd9:begin
-if(input_valid[0])
-res<=OPA<<1;
-end
-
-4'd10:begin
-if(input_valid[1])
-res<=OPB>>1;
-end
-
-4'd11:begin
-if(input_valid[1])
-res<=OPB<<1;
-end
-
-4'd12:begin
-if(input_valid==2'b11)
-begin
-    casex(OPB)
-    8'b0000x000:res=OPA;
-    8'b0000x001:res={OPA[N-1:1],OPA[0]};
-    8'b0000x010:res={OPA[N-1:2],OPA[1:0]};
-    8'b0000x011:res={OPA[N-1:3],OPA[2:0]};
-    8'b0000x100:res={OPA[N-1:4],OPA[3:0]};
-    8'b0000x101:res={OPA[N-1:5],OPA[4:0]};
-    8'b0000x110:res={OPA[N-1:6],OPA[5:0]};
-    8'b0000x111:res={OPA[N-1:1],OPA[0]};
-    default:err=1'b1;
-    endcase
+    if(input_valid==2'b11)
+    begin
+        if(count==2'b10)
+            res <= (OPA+1)*(OPB+1);
     end
-else
-err<=1'b1;
+    else
+        err <= 1;
 end
-
-4'd13:begin
-if(input_valid==2'b11)
- begin
-    casex(OPB)
-    8'b0000x000:res=OPA;
-    8'b0000x001:res={OPA[0],OPA[N-1:1]};
-    8'b0000x010:res={OPA[1:0],OPA[N-1:2]};
-    8'b0000x011:res={OPA[2:0],OPA[N-1:3]};
-    8'b0000x100:res={OPA[3:0],OPA[N-1:4]};
-    8'b0000x101:res={OPA[4:0],OPA[N-1:5]};
-    8'b0000x110:res={OPA[5:0],OPA[N-1:6]};
-    8'b0000x111:res={OPA[0],OPA[N-1:1]};
-    default:err=1'b1; 
-   endcase
- end
-err<=1'b1;
+4'd10:
+begin
+    if(input_valid==2'b11)
+    begin
+        if(count==2'b10)
+        begin
+            res <= (OPA<<1)*OPB;
+            {OFLOW,cout,G,L,E} <= 0;
+        end
+    end
+    else
+        err <= 1;
 end
+4'd11:
+begin
+    if(input_valid==2'b11)
+    begin
+        if(count==2'b10)
+        begin
+            res <= $signed(OPA) + $signed(OPB);
 
+            OFLOW <= (
+                        (OPA[N-1] == OPB[N-1]) &&
+                        (res[N-1] != OPA[N-1])
+                      );
+
+            {G,L,E} <= {
+                ($signed(OPA) > $signed(OPB)),
+                ($signed(OPA) < $signed(OPB)),
+                ($signed(OPA) == $signed(OPB))
+            };
+
+            cout <= 0;
+        end
+    end
+    else
+        err <= 1;
+end
+4'd12:
+begin
+    if(input_valid==2'b11)
+    begin
+        if(count==2'b10)
+        begin
+            res <= $signed(OPA) - $signed(OPB);
+
+            OFLOW <= (
+                        (OPA[N-1] != OPB[N-1]) &&
+                        (res[N-1] != OPA[N-1])
+                      );
+            {G,L,E} <= {
+                ($signed(OPA) > $signed(OPB)),
+                ($signed(OPA) < $signed(OPB)),
+                ($signed(OPA) == $signed(OPB))
+            };
+            cout <= 0;
+        end
+    end
+    else
+        err <= 1;
+end
 endcase
 end
+else
+begin
+{err,OFLOW,cout,G,E,L} <= 0;
+case(cmd)
+4'd0:
+if(input_valid==2'b11)
+    res <= OPA & OPB;
+4'd1:
+if(input_valid==2'b11)
+    res <= ~(OPA & OPB);
+4'd2:
+if(input_valid==2'b11)
+    res <= OPA | OPB;
+4'd3:
+if(input_valid==2'b11)
+    res <= ~(OPA | OPB);
+4'd4:
+if(input_valid==2'b11)
+    res <= OPA ^ OPB;
+4'd5:
+if(input_valid==2'b11)
+    res <= ~(OPA ^ OPB);
+4'd6:
+if(input_valid[0])
+    res <= ~OPA;
+4'd7:
+if(input_valid[1])
+    res <= ~OPB;
+4'd8:
+if(input_valid[0])
+    res <= OPA >> 1;
+4'd9:
+if(input_valid[0])
+    res <= OPA << 1;
+4'd10:
+if(input_valid[1])
+    res <= OPB >> 1;
+4'd11:
+if(input_valid[1])
+    res <= OPB << 1;
+4'd12:
+begin
+    if(input_valid==2'b11)
+    begin
+        rot = (OPA << (OPB % N)) |
+              (OPA >> (N - (OPB % N)));
 
+        res <= rot;
+    end
+    else
+        err <= 1;
 end
-
+4'd13:
+begin
+    if(input_valid==2'b11)
+    begin
+        rot = (OPA >> (OPB % N)) |
+              (OPA << (N - (OPB % N)));
+        res <= rot;
+    end
+    else
+        err <= 1;
+end
+endcase
+end
+end
 endmodule
