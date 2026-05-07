@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+
 module alu #(parameter N=8, parameter W=4)
 (
     input wire clk,
@@ -22,19 +23,22 @@ module alu #(parameter N=8, parameter W=4)
 
 reg [N-1:0] rot;
 reg [1:0] count;
+
 always @(posedge clk or posedge rst)
 begin
     if(rst)
         count <= 0;
+
     else if(CE)
     begin
-        if(mode&&(cmd==4'd9 || cmd==4'd10))
+      if(mode&&(cmd==4'd9 || cmd==4'd10))
         begin
             if(count < 3)
                 count <= count + 1;
             else
                 count <= 0;
         end
+
         else
         begin
             if(count < 1)
@@ -47,6 +51,7 @@ end
 
 always @(posedge clk or posedge rst)
 begin
+
 if(rst)
 begin
     res    <= 0;
@@ -57,6 +62,7 @@ begin
     L      <= 0;
     E      <= 0;
 end
+
 else if(!CE)
 begin
     res    <= res;
@@ -67,9 +73,12 @@ begin
     L      <= L;
     E      <= E;
 end
+
 else if(mode)
 begin
+
 case(cmd)
+
 4'd0:
 begin
     if(input_valid==2'b11)
@@ -82,6 +91,7 @@ begin
     else
         err <= 1;
 end
+
 4'd1:
 begin
     if(input_valid==2'b11)
@@ -94,6 +104,7 @@ begin
     else
         err <= 1;
 end
+
 4'd2:
 begin
     if(input_valid==2'b11)
@@ -106,6 +117,7 @@ begin
     else
         err <= 1;
 end
+
 4'd3:
 begin
     if(input_valid==2'b11)
@@ -118,6 +130,7 @@ begin
     else
         err <= 1;
 end
+
 4'd4:
 begin
     if(input_valid[0])
@@ -130,6 +143,7 @@ begin
     else
         err <= 1;
 end
+
 4'd5:
 begin
     if(input_valid[0])
@@ -142,6 +156,7 @@ begin
     else
         err <= 1;
 end
+
 4'd6:
 begin
     if(input_valid[1])
@@ -154,6 +169,7 @@ begin
     else
         err <= 1;
 end
+
 4'd7:
 begin
     if(input_valid[1])
@@ -166,6 +182,7 @@ begin
     else
         err <= 1;
 end
+
 4'd8:
 begin
     if(input_valid==2'b11)
@@ -181,6 +198,7 @@ begin
     else
         err <= 1;
 end
+
 4'd9:
 begin
     if(input_valid==2'b11)
@@ -191,6 +209,7 @@ begin
     else
         err <= 1;
 end
+
 4'd10:
 begin
     if(input_valid==2'b11)
@@ -204,12 +223,11 @@ begin
     else
         err <= 1;
 end
+
 4'd11:
 begin
     if(input_valid==2'b11)
     begin
-        if(count==2'b10)
-        begin
             res <= $signed(OPA) + $signed(OPB);
 
             OFLOW <= (
@@ -224,76 +242,93 @@ begin
             };
 
             cout <= 0;
-        end
     end
     else
         err <= 1;
 end
+
 4'd12:
 begin
     if(input_valid==2'b11)
     begin
-        if(count==2'b10)
-        begin
             res <= $signed(OPA) - $signed(OPB);
 
             OFLOW <= (
                         (OPA[N-1] != OPB[N-1]) &&
                         (res[N-1] != OPA[N-1])
                       );
+
             {G,L,E} <= {
                 ($signed(OPA) > $signed(OPB)),
                 ($signed(OPA) < $signed(OPB)),
                 ($signed(OPA) == $signed(OPB))
             };
+
             cout <= 0;
         end
-    end
     else
         err <= 1;
 end
+
 endcase
+
 end
+
 else
 begin
+
 {err,OFLOW,cout,G,E,L} <= 0;
+
 case(cmd)
+
 4'd0:
 if(input_valid==2'b11)
     res <= OPA & OPB;
+
 4'd1:
 if(input_valid==2'b11)
     res <= ~(OPA & OPB);
+
 4'd2:
 if(input_valid==2'b11)
     res <= OPA | OPB;
+
 4'd3:
 if(input_valid==2'b11)
     res <= ~(OPA | OPB);
+
 4'd4:
 if(input_valid==2'b11)
     res <= OPA ^ OPB;
+
 4'd5:
 if(input_valid==2'b11)
     res <= ~(OPA ^ OPB);
+
 4'd6:
 if(input_valid[0])
     res <= ~OPA;
+
 4'd7:
 if(input_valid[1])
     res <= ~OPB;
+
 4'd8:
 if(input_valid[0])
     res <= OPA >> 1;
+
 4'd9:
 if(input_valid[0])
     res <= OPA << 1;
+
 4'd10:
 if(input_valid[1])
     res <= OPB >> 1;
+
 4'd11:
 if(input_valid[1])
     res <= OPB << 1;
+
 4'd12:
 begin
     if(input_valid==2'b11)
@@ -306,18 +341,24 @@ begin
     else
         err <= 1;
 end
+
 4'd13:
 begin
     if(input_valid==2'b11)
     begin
         rot = (OPA >> (OPB % N)) |
               (OPA << (N - (OPB % N)));
+
         res <= rot;
     end
     else
         err <= 1;
 end
+
 endcase
+
 end
+
 end
+
 endmodule
