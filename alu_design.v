@@ -28,7 +28,7 @@ begin
         count <= 0;
     else if(CE)
     begin
-        if(cmd==4'd9 || cmd==4'd10)
+        if(mode&&(cmd==4'd9 || cmd==4'd10))
         begin
             if(count < 3)
                 count <= count + 1;
